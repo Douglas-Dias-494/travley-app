@@ -1,15 +1,51 @@
 // travelForm.js
 import React, { useState } from "react";
-import { View, Text, TouchableOpacity, TextInput, Image, Platform, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, TextInput, Image, StyleSheet, FlatList, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import DateTimePicker from '@react-native-community/datetimepicker'; // Apenas para o DatePickerInput customizado
 import DatePickerInput from './DatePickerInput'; // Importe seu novo componente!
 
 // Importe o logo corretamente (certifique-se de que o caminho está certo)
-import logo from '../assets/images/TRAVLEY.png'; 
+import logo from '../assets/images/TRAVLEY.png';
 
 function TravelForm() { // Renomeado para TravelForm com T maiúsculo (boa prática)
+
+    const [query, setQuery] = useState("");
+    const [results, setResults] = useState([]);
+    const [showList, setShowList] = useState(false);
+
+    const handleSearch = async (text) => {
+        setQuery(text);
+        if (text.length < 3) {
+            setResults([]);
+            setShowList(false);
+            return;
+        }
+
+        try {
+            const response = await fetch(
+                `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(text)}&limit=5`, {
+                headers: {
+                    'User-Agent': 'SeuAppViagens/1.0 (contato@seuapp.com)',
+                    'Accept': 'application/json',
+                },
+            }
+
+            );
+            const data = await response.json();
+            setResults(data);
+            setShowList(true);
+        } catch (error) {
+            console.error("Erro na busca:", error);
+        }
+    };
+
+    const handleSelect = (place) => {
+        setQuery(place.display_name); // Preenche o campo
+        setResults([]); // Limpa resultados
+        setShowList(false); // Fecha lista
+    };
+
 
     const router = useRouter();
 
@@ -24,23 +60,48 @@ function TravelForm() { // Renomeado para TravelForm com T maiúsculo (boa prát
                 <View style={styles.mainView}>
                     <View style={styles.logoBox}>
                         <Image source={logo} style={styles.logoImage} />
+                        <Text style={{ color: '#2e4057', fontWeight: "800" }}>Vamos começar os preparativos...</Text>
                     </View>
                     <View style={styles.formContent}>
                         <Text style={styles.label}>Viagem</Text>
                         <TextInput style={styles.inputBoxes} placeholder="Digite o nome da sua viagem..." />
 
-                        <Text style={styles.label}>Destino</Text>
-                        <TextInput style={styles.inputBoxes} placeholder="Digite o seu destino final..." />
+                        <View style={styles.container}>
+                            <Text style={styles.label}>Destino</Text>
+                            <TextInput
+                                style={styles.inputBoxes}
+                                placeholder="Digite o seu destino final..."
+                                value={query}
+                                onChangeText={handleSearch}
+                            />
+
+                            {showList && results.length > 0 && (
+                                <FlatList
+                                    data={results}
+                                    keyExtractor={(item) => item.place_id.toString()}
+                                    style={styles.dropdown}
+                                    keyboardShouldPersistTaps="handled"
+                                    renderItem={({ item }) => (
+                                        <TouchableOpacity
+                                            onPress={() => handleSelect(item)}
+                                            style={styles.option}
+                                        >
+                                            <Text>{item.display_name}</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                />
+                            )}
+                        </View>
 
                         {/* Usando o componente DatePickerInput customizado para Data de Partida */}
-                        <DatePickerInput 
+                        <DatePickerInput
                             label="Data de partida"
                             placeholder="Selecione a data de partida"
                             onDateChange={setStartDate} // Atualiza o estado da data de partida
                         />
 
                         {/* Usando o componente DatePickerInput customizado para Data de Volta */}
-                        <DatePickerInput 
+                        <DatePickerInput
                             label="Data de volta"
                             placeholder="Selecione a data de volta"
                             onDateChange={setEndDate} // Atualiza o estado da data de volta
@@ -70,6 +131,10 @@ const styles = StyleSheet.create({
     outerContainer: {
         flex: 1,
     },
+    container: {
+        position: 'relative',
+        marginBottom: 15,
+    },
     mainView: {
         alignItems: "center",
         justifyContent: "center", // Ajustado para centralizar o conteúdo verticalmente no seu container
@@ -84,6 +149,7 @@ const styles = StyleSheet.create({
         top: 20, // Ajustado um pouco para baixo para não ficar tão no topo
         alignSelf: 'center', // Centraliza o logo horizontalmente
         zIndex: 1, // Garante que o logo fique acima dos outros elementos se houver sobreposição
+        alignItems: "center"
     },
     logoImage: {
         width: 100, // Diminuído um pouco para não ser muito grande
@@ -128,7 +194,59 @@ const styles = StyleSheet.create({
         color: 'white', // Alterado para branco para contraste com o fundo
         fontSize: 16,
         fontWeight: 'bold',
-    }
+    },
+    input: {
+        borderWidth: 1, padding: 8, margin: 10, borderRadius: 5
+    },
+
+    suggestion: {
+        padding: 10, borderBottomWidth: 1, borderBottomColor: '#ccc'
+    },
+    input: {
+        borderWidth: 1,
+        borderColor: '#ddd',
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        backgroundColor: '#fff',
+    },
+    dropdown: {
+        position: 'absolute',
+        top: 48, // ajusta conforme a altura do input
+        left: 0,
+        right: 0,
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: '#ddd',
+        borderTopWidth: 0,
+        borderBottomLeftRadius: 8,
+        borderBottomRightRadius: 8,
+        maxHeight: 240, // ← rolável
+        zIndex: 9999,   // Android precisa disso
+        ...Platform.select({
+            android: { elevation: 6 },
+            ios: {
+                shadowColor: '#000',
+                shadowOpacity: 0.1,
+                shadowRadius: 8,
+                shadowOffset: { width: 0, height: 4 },
+            },
+        }),
+    },
+    option: {
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#eee',
+    },
+    optionText: {
+        fontSize: 14,
+    },
+    empty: {
+        padding: 12,
+        color: '#666',
+        fontStyle: 'italic',
+    },
 });
 
 export default TravelForm;
